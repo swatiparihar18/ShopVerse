@@ -1,0 +1,26 @@
+services:
+  backend:
+    build: ./backend
+    container_name: shopverse-backend
+    expose:
+      - "5000"          # sirf internal network pe, host pe nahi
+    env_file:
+      - ./backend/.env
+    restart: unless-stopped
+    networks:
+      - shopverse-net
+
+  frontend:
+    build: ./frontend
+    container_name: shopverse-frontend
+    ports:
+      - "80:80"         # sirf frontend bahar
+    depends_on:
+      - backend
+    restart: unless-stopped
+    networks:
+      - shopverse-net
+
+networks:
+  shopverse-net:
+    driver: bridge
