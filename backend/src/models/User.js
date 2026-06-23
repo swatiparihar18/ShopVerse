@@ -89,6 +89,14 @@ const userSchema = new mongoose.Schema(
       type: Number,
       default: 0,
       select: false
+    },
+    passwordResetToken: {
+      type: String,
+      select: false
+    },
+    passwordResetExpires: {
+      type: Date,
+      select: false
     }
   },
   { timestamps: true }

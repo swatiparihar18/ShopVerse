@@ -1,10 +1,10 @@
-export const API_URL = '/api'
+export const API_URL = 'http://13.53.172.109:5000'
 import { authStorage } from '../utils/authStorage'
 
 const getToken = () => authStorage.getToken()
 
 const buildUrl = (path, params) => {
-  const url = new URL(`${API_URL}${path}`, window.location.origin)
+  const url = new URL(`${API_URL}/api${path}`)
   Object.entries(params || {}).forEach(([key, value]) => {
     if (value !== undefined && value !== null && value !== '') {
       url.searchParams.set(key, value)
@@ -15,10 +15,8 @@ const buildUrl = (path, params) => {
 
 export const normalizeProduct = (product) => {
   if (!product) return null
-  const gallery = [
-    ...(product.images || []).map((item) => item.url).filter(Boolean),
-    product.imageUrl
-  ].filter(Boolean)
+  const imageRecords = [...(product.images || [])].sort((a, b) => Number(Boolean(b.isPrimary)) - Number(Boolean(a.isPrimary)))
+  const gallery = [...new Set([...imageRecords.map((item) => item.url), product.imageUrl].filter(Boolean))]
   const image = gallery[0] || ''
   const price = Number(product.discountPrice > 0 ? product.discountPrice : product.price) || 0
   const originalPrice = Number(product.price) || price
@@ -102,6 +100,8 @@ export const authApi = {
   register: (payload) => apiRequest('/auth/register', { method: 'POST', body: JSON.stringify(payload) }),
   verifyOtp: (payload) => apiRequest('/auth/verify-otp', { method: 'POST', body: JSON.stringify(payload) }),
   resendOtp: (payload) => apiRequest('/auth/resend-otp', { method: 'POST', body: JSON.stringify(payload) }),
+  forgotPassword: (payload) => apiRequest('/auth/forgot-password', { method: 'POST', body: JSON.stringify(payload), emitAuthExpired: false }),
+  resetPassword: (token, payload) => apiRequest(`/auth/reset-password/${encodeURIComponent(token)}`, { method: 'POST', body: JSON.stringify(payload), emitAuthExpired: false }),
   login: (payload) => apiRequest('/auth/login', { method: 'POST', body: JSON.stringify(payload) }),
   logout: () => apiRequest('/auth/logout', { method: 'POST' }),
   profile: () => apiRequest('/auth/profile', { emitAuthExpired: false }),
@@ -110,6 +110,15 @@ export const authApi = {
 
 export const productApi = {
   list: (params) => apiRequest('/products', { params }),
+  featured: async () => {
+    try {
+      return await apiRequest('/products/featured')
+    } catch (error) {
+      if (error.status !== 404) throw error
+      return apiRequest('/products', { params: { featured: true, active: true, limit: 20 } })
+    }
+  },
+  validate: (ids) => apiRequest('/products/validate', { method: 'POST', body: JSON.stringify({ ids }), emitAuthExpired: false }),
   detail: (id) => apiRequest(`/products/${id}`),
   create: (formData) => apiRequest('/products', { method: 'POST', body: formData }),
   update: (id, formData) => apiRequest(`/products/${id}`, { method: 'PUT', body: formData }),

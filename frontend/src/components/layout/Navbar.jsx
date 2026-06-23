@@ -1,16 +1,14 @@
 import { useState, useRef, useEffect } from 'react'
 import { Link, useNavigate, useLocation } from 'react-router-dom'
-import { ShoppingCart, Heart, Sun, Moon, Search, Menu, X, Zap, User, LogOut, LayoutDashboard, ShieldCheck } from 'lucide-react'
+import { ShoppingCart, Heart, Search, Menu, X, Zap, User, LogOut, LayoutDashboard, ShieldCheck } from 'lucide-react'
 import { useCart }     from '../../context/CartContext'
 import { useWishlist } from '../../context/WishlistContext'
-import { useTheme }    from '../../context/ThemeContext'
 import { useAuth }     from '../../context/AuthContext'
 import { useToast }    from '../../context/ToastContext'
 
 export default function Navbar() {
   const { cartCount }         = useCart()
   const { wishlist }          = useWishlist()
-  const { dark, toggleTheme } = useTheme()
   const { user, isAuthenticated, isAdmin, logout } = useAuth()
   const { showToast } = useToast()
   const [open,  setOpen]      = useState(false)
@@ -51,7 +49,7 @@ export default function Navbar() {
               <Zap className="w-5 h-5 text-white fill-white" />
             </div>
             <span className="font-display font-bold text-xl text-gray-900 dark:text-white">
-              Shop<span className="text-primary-500">Verse</span>
+              Creation <span className="text-primary-500">Corner</span>
             </span>
           </Link>
 
@@ -88,10 +86,6 @@ export default function Navbar() {
               <ShoppingCart className={`w-5 h-5 transition-colors ${location.pathname === '/cart' ? 'text-primary-500' : 'text-gray-600 dark:text-gray-300 group-hover:text-primary-500'}`} />
               {cartCount > 0 && <span className="absolute -top-0.5 -right-0.5 bg-primary-500 text-white text-[10px] font-bold rounded-full w-4 h-4 flex items-center justify-center">{cartCount}</span>}
             </Link>
-
-            <button onClick={toggleTheme} className="p-2.5 rounded-xl hover:bg-gray-100 dark:hover:bg-gray-800 transition-colors text-gray-600 dark:text-gray-300 hover:text-primary-500">
-              {dark ? <Sun className="w-5 h-5" /> : <Moon className="w-5 h-5" />}
-            </button>
 
             {isAuthenticated ? (
               <>
@@ -133,9 +127,6 @@ export default function Navbar() {
               <ShoppingCart className="w-5 h-5 text-gray-700 dark:text-gray-300" />
               {cartCount > 0 && <span className="absolute -top-0.5 -right-0.5 bg-primary-500 text-white text-[10px] font-bold rounded-full w-4 h-4 flex items-center justify-center">{cartCount}</span>}
             </Link>
-            <button onClick={toggleTheme} className="p-2 rounded-lg text-gray-600 dark:text-gray-300">
-              {dark ? <Sun className="w-5 h-5" /> : <Moon className="w-5 h-5" />}
-            </button>
             <button onClick={() => setOpen(!open)} className="p-2 rounded-lg text-gray-700 dark:text-gray-300">
               {open ? <X className="w-5 h-5" /> : <Menu className="w-5 h-5" />}
             </button>

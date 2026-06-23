@@ -10,7 +10,7 @@ const ensureAdmin = async () => {
 
   const existingUser = await User.findOne({ email: ADMIN_EMAIL });
   if (existingUser) {
-    existingUser.name = existingUser.name || ADMIN_NAME || "ShopVerse Admin";
+    existingUser.name = existingUser.name || ADMIN_NAME || "Creation Corner Admin";
     existingUser.role = "admin";
     existingUser.status = "active";
     existingUser.phone = existingUser.phone || process.env.ADMIN_PHONE || "0000000000";
@@ -22,7 +22,7 @@ const ensureAdmin = async () => {
   }
 
   const admin = await User.create({
-    name: ADMIN_NAME || "ShopVerse Admin",
+    name: ADMIN_NAME || "Creation Corner Admin",
     email: ADMIN_EMAIL,
     phone: process.env.ADMIN_PHONE || "0000000000",
     password: ADMIN_PASSWORD,

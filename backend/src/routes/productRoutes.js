@@ -5,8 +5,10 @@ const {
   deleteProduct,
   downloadProductTemplate,
   getImportHistory,
+  getFeaturedProducts,
   getProductById,
   getProducts,
+  validateProducts,
   uploadProducts,
   updateProduct
 } = require("../controllers/productController");
@@ -24,6 +26,8 @@ router
 
 router.get("/template", protect, admin, downloadProductTemplate);
 router.get("/imports", protect, admin, getImportHistory);
+router.get("/featured", getFeaturedProducts);
+router.post("/validate", validateProducts);
 router.post("/upload", protect, admin, spreadsheetUpload.single("file"), uploadProducts);
 router.post("/:id/reviews", protect, createProductReview);
 

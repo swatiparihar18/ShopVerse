@@ -1,6 +1,6 @@
 .hero-slider {
   width: 100%;
-  background: #f3f4f6;
+  background: #fff1f5;
 }
 
 .hero-slider__viewport {
@@ -23,6 +23,7 @@
   gap: 32px;
   min-height: 360px;
   padding: 42px max(24px, calc((100vw - 1280px) / 2 + 24px)) 54px;
+  background: linear-gradient(120deg, #fff1f5 0%, #ffe4ec 100%);
 }
 
 .hero-slider__content {
@@ -100,7 +101,8 @@
 
 .hero-slider__media img {
   display: block;
-  object-fit: cover;
+  object-fit: contain;
+  padding: 12px;
 }
 
 .hero-slider__fallback {
@@ -110,7 +112,12 @@
   color: #6b7280;
   font-weight: 800;
   text-align: center;
+  flex-direction: column;
+  gap: 10px;
 }
+
+.hero-slider__fallback svg { width: 34px; height: 34px; }
+.hero-slider__current-price { margin-top: 18px; color: #b91f50; font-size: 24px; font-weight: 900; }
 
 .hero-slider__price {
   position: absolute;

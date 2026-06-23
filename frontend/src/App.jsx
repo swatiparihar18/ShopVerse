@@ -2,7 +2,6 @@ import { BrowserRouter, Routes, Route } from 'react-router-dom'
 import { AuthProvider }     from './context/AuthContext'
 import { CartProvider }     from './context/CartContext'
 import { WishlistProvider } from './context/WishlistContext'
-import { ThemeProvider }    from './context/ThemeContext'
 import { ToastProvider }    from './context/ToastContext'
 import Navbar         from './components/layout/Navbar'
 import Footer         from './components/layout/Footer'
@@ -38,8 +37,7 @@ function Layout({ children }) {
 
 export default function App() {
   return (
-    <ThemeProvider>
-      <ToastProvider>
+    <ToastProvider>
         <AuthProvider>
           <CartProvider>
             <WishlistProvider>
@@ -68,7 +66,6 @@ export default function App() {
             </WishlistProvider>
           </CartProvider>
         </AuthProvider>
-      </ToastProvider>
-    </ThemeProvider>
+    </ToastProvider>
   )
 }

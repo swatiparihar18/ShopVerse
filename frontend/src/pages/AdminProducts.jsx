@@ -1,20 +1,22 @@
 import { useEffect, useMemo, useState } from 'react'
-import { Download, FileSpreadsheet, Pencil, Plus, RefreshCw, Trash2, UploadCloud, X } from 'lucide-react'
+import { ArrowLeft, ArrowRight, Download, FileSpreadsheet, ImagePlus, Pencil, Plus, RefreshCw, Star, Trash2, UploadCloud, X } from 'lucide-react'
 import { normalizeProduct, productApi } from '../services/api'
 import { useToast } from '../context/ToastContext'
 
 const initialForm = {
   name: '',
   description: '',
+  heroDescription: '',
   price: '',
   discountPrice: '',
   category: '',
-  brand: 'ShopVerse',
+  brand: 'Creation Corner',
   stock: '',
   sku: '',
   imageUrl: '',
   status: 'active',
-  isFeatured: false
+  isFeatured: false,
+  isActive: true
 }
 
 const money = (value) => `Rs. ${Number(value || 0).toLocaleString()}`
@@ -24,7 +26,8 @@ export default function AdminProducts() {
   const [imports, setImports] = useState([])
   const [form, setForm] = useState(initialForm)
   const [editingProduct, setEditingProduct] = useState(null)
-  const [images, setImages] = useState([])
+  const [imageItems, setImageItems] = useState([])
+  const [primaryIndex, setPrimaryIndex] = useState(0)
   const [spreadsheet, setSpreadsheet] = useState(null)
   const [uploadResult, setUploadResult] = useState(null)
   const [loading, setLoading] = useState(true)
@@ -43,7 +46,7 @@ export default function AdminProducts() {
     setError('')
     try {
       const [productData, importData] = await Promise.all([
-        productApi.list({ limit: 100, sort: 'newest' }),
+        productApi.list({ limit: 100, sort: 'newest', active: 'all' }),
         productApi.imports()
       ])
       setProducts((productData.products || []).map(normalizeProduct))
@@ -66,24 +69,32 @@ export default function AdminProducts() {
   const resetForm = () => {
     setForm(initialForm)
     setEditingProduct(null)
-    setImages([])
+    imageItems.filter((item) => item.type === 'new').forEach((item) => URL.revokeObjectURL(item.url))
+    setImageItems([])
+    setPrimaryIndex(0)
   }
 
   const startEdit = (product) => {
     setEditingProduct(product)
-    setImages([])
+    const existing = (product.images || []).map((image) => ({ type: 'existing', url: image.url, public_id: image.public_id || '' }))
+    if (existing.length === 0 && product.imageUrl) existing.push({ type: 'existing', url: product.imageUrl, public_id: '' })
+    setImageItems(existing)
+    const selectedPrimary = (product.images || []).findIndex((image) => image.isPrimary)
+    setPrimaryIndex(selectedPrimary >= 0 ? selectedPrimary : 0)
     setForm({
       name: product.name || '',
       description: product.description || '',
+      heroDescription: product.heroDescription || '',
       price: product.originalPrice || product.price || '',
       discountPrice: product.discountPrice || '',
       category: product.category || '',
-      brand: product.brand || 'ShopVerse',
+      brand: product.brand || 'Creation Corner',
       stock: product.stock ?? '',
       sku: product.sku || '',
-      imageUrl: product.imageUrl || product.image || '',
+      imageUrl: '',
       status: product.status || 'active',
-      isFeatured: Boolean(product.isFeatured)
+      isFeatured: Boolean(product.isFeatured),
+      isActive: product.isActive !== false && product.status === 'active'
     })
     window.scrollTo({ top: 0, behavior: 'smooth' })
   }
@@ -93,10 +104,50 @@ export default function AdminProducts() {
     Object.entries(form).forEach(([key, value]) => {
       body.append(key, key === 'isFeatured' ? String(Boolean(value)) : value)
     })
-    Array.from(images).forEach((file) => {
+    const newItems = imageItems.filter((item) => item.type === 'new')
+    newItems.forEach(({ file }) => {
       body.append('images', file)
     })
+    body.append('imageOrder', JSON.stringify(imageItems.map((item) => item.type === 'new'
+      ? { type: 'new', index: newItems.indexOf(item) }
+      : { type: 'existing', url: item.url, public_id: item.public_id }
+    )))
+    body.append('primaryIndex', String(primaryIndex))
     return body
+  }
+
+  const addImages = (files) => {
+    const selected = Array.from(files || [])
+    const allowed = new Set(['image/jpeg', 'image/png', 'image/webp', 'image/gif'])
+    if (imageItems.length + selected.length > 8) {
+      setError('A product can have at most 8 images')
+      return
+    }
+    const invalid = selected.find((file) => !allowed.has(file.type) || file.size > 5 * 1024 * 1024)
+    if (invalid) {
+      setError('Images must be JPG, PNG, WebP, or GIF and no larger than 5 MB each')
+      return
+    }
+    setError('')
+    setImageItems((current) => [...current, ...selected.map((file) => ({ type: 'new', file, url: URL.createObjectURL(file) }))])
+  }
+
+  const removeImage = (index) => {
+    const removed = imageItems[index]
+    if (removed?.type === 'new') URL.revokeObjectURL(removed.url)
+    setImageItems((current) => current.filter((_, itemIndex) => itemIndex !== index))
+    setPrimaryIndex((current) => current === index ? 0 : current > index ? current - 1 : current)
+  }
+
+  const moveImage = (index, direction) => {
+    const target = index + direction
+    if (target < 0 || target >= imageItems.length) return
+    setImageItems((current) => {
+      const next = [...current]
+      ;[next[index], next[target]] = [next[target], next[index]]
+      return next
+    })
+    setPrimaryIndex((current) => current === index ? target : current === target ? index : current)
   }
 
   const submitProduct = async (event) => {
@@ -226,24 +277,43 @@ export default function AdminProducts() {
               </div>
               <Field label="Image URL" value={form.imageUrl} onChange={(value) => updateField('imageUrl', value)} />
               <div>
-                <label className="mb-1.5 block text-sm font-semibold text-gray-700 dark:text-gray-200">Upload images</label>
-                <input className="input" type="file" accept="image/*" multiple onChange={(event) => setImages(event.target.files || [])} />
-                <p className="mt-1 text-xs text-gray-500 dark:text-gray-400">Optional. New uploaded images replace existing images when editing.</p>
+                <label className="mb-1.5 block text-sm font-semibold text-gray-700 dark:text-gray-200">Product images ({imageItems.length}/8)</label>
+                <label className="flex cursor-pointer items-center justify-center gap-2 rounded-xl border-2 border-dashed border-gray-200 px-4 py-3 text-sm font-semibold text-gray-600 hover:border-primary-300 hover:text-primary-600 dark:border-gray-600 dark:text-gray-300">
+                  <ImagePlus className="h-4 w-4" /> Add images
+                  <input className="sr-only" type="file" accept="image/jpeg,image/png,image/webp,image/gif" multiple onChange={(event) => { addImages(event.target.files); event.target.value = '' }} />
+                </label>
+                <p className="mt-1 text-xs text-gray-500 dark:text-gray-400">JPG, PNG, WebP or GIF; 5 MB each. Choose a primary image and reorder with arrows.</p>
+                {imageItems.length > 0 && <div className="mt-3 grid grid-cols-2 gap-3 sm:grid-cols-3">
+                  {imageItems.map((item, index) => <div key={`${item.url}-${index}`} className={`relative overflow-hidden rounded-xl border-2 bg-gray-100 ${primaryIndex === index ? 'border-primary-500' : 'border-gray-200 dark:border-gray-600'}`}>
+                    <img src={item.url} alt={`Product preview ${index + 1}`} className="aspect-square w-full object-contain p-1" />
+                    <div className="absolute inset-x-1 bottom-1 flex justify-center gap-1 rounded-lg bg-gray-950/70 p-1">
+                      <button type="button" onClick={() => moveImage(index, -1)} disabled={index === 0} className="rounded p-1 text-white disabled:opacity-30" aria-label="Move image left"><ArrowLeft className="h-3.5 w-3.5" /></button>
+                      <button type="button" onClick={() => setPrimaryIndex(index)} className={`rounded p-1 ${primaryIndex === index ? 'text-primary-300' : 'text-white'}`} aria-label="Set primary image"><Star className="h-3.5 w-3.5" fill={primaryIndex === index ? 'currentColor' : 'none'} /></button>
+                      <button type="button" onClick={() => moveImage(index, 1)} disabled={index === imageItems.length - 1} className="rounded p-1 text-white disabled:opacity-30" aria-label="Move image right"><ArrowRight className="h-3.5 w-3.5" /></button>
+                      <button type="button" onClick={() => removeImage(index)} className="rounded p-1 text-red-300" aria-label="Remove image"><Trash2 className="h-3.5 w-3.5" /></button>
+                    </div>
+                    {primaryIndex === index && <span className="absolute left-1 top-1 rounded bg-primary-500 px-1.5 py-0.5 text-[10px] font-bold text-white">Primary</span>}
+                  </div>)}
+                </div>}
               </div>
               <div className="grid grid-cols-2 gap-3">
                 <div>
                   <label className="mb-1.5 block text-sm font-semibold text-gray-700 dark:text-gray-200">Status</label>
-                  <select className="input" value={form.status} onChange={(event) => updateField('status', event.target.value)}>
+                  <select className="input" value={form.status} onChange={(event) => setForm((current) => ({ ...current, status: event.target.value, isActive: event.target.value === 'active' }))}>
                     <option value="active">Active</option>
                     <option value="inactive">Inactive</option>
                     <option value="draft">Draft</option>
                     <option value="archived">Archived</option>
                   </select>
                 </div>
-                <label className="mt-7 flex items-center gap-2 text-sm font-semibold text-gray-700 dark:text-gray-200">
-                  <input type="checkbox" checked={form.isFeatured} onChange={(event) => updateField('isFeatured', event.target.checked)} />
-                  Featured
-                </label>
+                <div className="mt-7 space-y-2">
+                  <label className="flex items-center gap-2 text-sm font-semibold text-gray-700"><input type="checkbox" checked={form.isFeatured} onChange={(event) => updateField('isFeatured', event.target.checked)} />Featured</label>
+                  <label className="flex items-center gap-2 text-sm font-semibold text-gray-700"><input type="checkbox" checked={form.isActive} onChange={(event) => setForm((current) => ({ ...current, isActive: event.target.checked, status: event.target.checked ? 'active' : 'inactive' }))} />Active</label>
+                </div>
+              </div>
+              <div>
+                <label className="mb-1.5 block text-sm font-semibold text-gray-700">Hero description</label>
+                <textarea className="input min-h-20 resize-y" maxLength={240} value={form.heroDescription} onChange={(event) => updateField('heroDescription', event.target.value)} placeholder="Optional short copy for the hero banner" />
               </div>
               <div>
                 <label className="mb-1.5 block text-sm font-semibold text-gray-700 dark:text-gray-200">Description</label>
@@ -312,7 +382,7 @@ export default function AdminProducts() {
                       <td className="px-5 py-4">
                         <div className="flex items-center gap-3">
                           <div className="h-12 w-12 flex-shrink-0 overflow-hidden rounded-xl bg-gray-100 dark:bg-gray-700">
-                            {product.image ? <img src={product.image} alt={product.name} className="h-full w-full object-cover" /> : <FileSpreadsheet className="m-3 h-6 w-6 text-gray-400" />}
+                            {product.image ? <img src={product.image} alt={product.name} className="h-full w-full object-contain p-1" /> : <FileSpreadsheet className="m-3 h-6 w-6 text-gray-400" />}
                           </div>
                           <div className="min-w-48">
                             <p className="font-semibold text-gray-900 dark:text-white">{product.name}</p>

@@ -40,11 +40,11 @@ const generateOtp = () => crypto.randomInt(100000, 1000000).toString();
 const sendOtpToUser = async (user, otp) => {
   await sendEmail({
     to: user.email,
-    subject: "Verify your ShopVerse account",
-    text: `Your ShopVerse verification OTP is ${otp}. It expires in 5 minutes.`,
+    subject: "Verify your Creation Corner account",
+    text: `Your Creation Corner verification OTP is ${otp}. It expires in 5 minutes.`,
     html: `
       <div style="font-family:Arial,sans-serif;line-height:1.5">
-        <h2>Verify your ShopVerse account</h2>
+        <h2>Verify your Creation Corner account</h2>
         <p>Your OTP is:</p>
         <p style="font-size:28px;font-weight:700;letter-spacing:4px">${otp}</p>
         <p>This OTP expires in 5 minutes.</p>
@@ -74,6 +74,7 @@ const setUserOtp = async (user) => {
 };
 
 const register = async (req, res, next) => {
+  console.log("REGISTER HIT");
   try {
     const { name, email, password, phone } = req.body;
     const normalizedEmail = normalizeEmail(email);
@@ -244,6 +245,76 @@ const resendOtp = async (req, res, next) => {
   }
 };
 
+const forgotPassword = async (req, res, next) => {
+  const genericMessage = "If an account exists for that email, a password reset link has been sent.";
+  try {
+    const email = normalizeEmail(req.body.email);
+    if (!isValidEmail(email)) {
+      res.status(200).json({ success: true, message: genericMessage });
+      return;
+    }
+
+    const user = await User.findOne({ email }).select("+passwordResetToken +passwordResetExpires");
+    if (user) {
+      const token = crypto.randomBytes(32).toString("hex");
+      user.passwordResetToken = crypto.createHash("sha256").update(token).digest("hex");
+      user.passwordResetExpires = new Date(Date.now() + 15 * 60 * 1000);
+      await user.save({ validateBeforeSave: false });
+
+      const frontendUrl = (process.env.FRONTEND_URL || "http://localhost:5173").replace(/\/$/, "");
+      const resetUrl = `${frontendUrl}/reset-password/${token}`;
+      try {
+        await sendEmail({
+          to: user.email,
+          subject: "Reset your Creation Corner password",
+          text: `Reset your Creation Corner password using this link: ${resetUrl}. The link expires in 15 minutes.`,
+          html: `<div style="font-family:Arial,sans-serif;line-height:1.6"><h2>Reset your password</h2><p>This secure link expires in 15 minutes and can be used once.</p><p><a href="${resetUrl}">Reset password</a></p><p>If you did not request this, ignore this email.</p></div>`
+        });
+      } catch (emailError) {
+        user.passwordResetToken = undefined;
+        user.passwordResetExpires = undefined;
+        await user.save({ validateBeforeSave: false });
+        console.error(`Unable to send password reset email: ${emailError.message}`);
+      }
+    }
+
+    res.status(200).json({ success: true, message: genericMessage });
+  } catch (error) {
+    next(error);
+  }
+};
+
+const resetPassword = async (req, res, next) => {
+  try {
+    const token = String(req.params.token || "");
+    const { password } = req.body;
+    if (!token || !isStrongPassword(password)) {
+      res.status(400);
+      throw new Error("Use a valid reset link and a password with at least 8 characters, uppercase, lowercase, and a number");
+    }
+
+    const hashedToken = crypto.createHash("sha256").update(token).digest("hex");
+    const user = await User.findOne({
+      passwordResetToken: hashedToken,
+      passwordResetExpires: { $gt: new Date() }
+    }).select("+password +passwordResetToken +passwordResetExpires");
+
+    if (!user) {
+      res.status(400);
+      throw new Error("This password reset link is invalid or has expired");
+    }
+
+    user.password = password;
+    user.passwordResetToken = undefined;
+    user.passwordResetExpires = undefined;
+    await user.save();
+    res.cookie("token", "", { ...cookieOptions, expires: new Date(0) });
+    res.status(200).json({ success: true, message: "Password reset successfully. You can now log in." });
+  } catch (error) {
+    next(error);
+  }
+};
+
 const login = async (req, res, next) => {
   try {
     const { email, password } = req.body;
@@ -356,5 +427,7 @@ module.exports = {
   getProfile,
   updateProfile,
   verifyOtp,
-  resendOtp
+  resendOtp,
+  forgotPassword,
+  resetPassword
 };

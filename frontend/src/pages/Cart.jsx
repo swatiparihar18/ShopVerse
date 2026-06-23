@@ -4,11 +4,13 @@ import { useCart }  from '../context/CartContext'
 import EmptyState   from '../components/common/EmptyState'
 
 export default function Cart() {
-  const { cart, removeFromCart, increment, decrement, clearCart, cartTotal } = useCart()
+  const { cart, removeFromCart, increment, decrement, clearCart, cartTotal, loading } = useCart()
 
   const TAX      = Math.round(cartTotal * 0.18)
   const DELIVERY = cartTotal > 499 ? 0 : 49
   const GRAND    = cartTotal + TAX + DELIVERY
+
+  if (loading) return <div className="page-container"><div className="skeleton h-9 w-48" /><div className="mt-8 grid gap-4 lg:grid-cols-3"><div className="skeleton h-40 lg:col-span-2" /><div className="skeleton h-64" /></div></div>
 
   if (cart.length === 0) return (
     <div className="page-container">
@@ -34,7 +36,7 @@ export default function Cart() {
             return (
               <div key={item.id} className="card p-4 flex gap-4 animate-fade-in">
                 <Link to={`/product/${item.id}`} className="flex-shrink-0 w-24 h-24 sm:w-28 sm:h-28 rounded-xl overflow-hidden bg-gray-100 dark:bg-gray-700">
-                  <img src={item.image} alt={item.name} className="w-full h-full object-cover hover:scale-105 transition-transform" />
+                  {item.image ? <img src={item.image} alt={item.name} className="h-full w-full object-contain p-2 hover:scale-105 transition-transform" onError={(event) => { event.currentTarget.style.display = 'none' }} /> : <span className="flex h-full items-center justify-center px-2 text-center text-xs text-gray-400">No image available</span>}
                 </Link>
                 <div className="flex-1 min-w-0">
                   <p className="text-xs font-semibold text-primary-500 uppercase tracking-wide mb-0.5">{item.category}</p>

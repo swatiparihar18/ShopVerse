@@ -4,11 +4,27 @@ const Product = require("../models/Product");
 
 const createOrder = async (req, res, next) => {
   try {
-    const { orderItems, shippingAddress, paymentMethod, taxPrice = 0, shippingPrice = 0 } = req.body;
+    const {
+      orderItems,
+      shippingAddress,
+      paymentMethod = "Cash on Delivery",
+      customerName,
+      customerPhone
+    } = req.body;
 
-    if (!shippingAddress || !paymentMethod) {
+    const requiredAddressFields = ["street", "city", "state", "postalCode", "country"];
+    if (!shippingAddress || requiredAddressFields.some((field) => !String(shippingAddress[field] || "").trim())) {
       res.status(400);
-      throw new Error("Shipping address and payment method are required");
+      throw new Error("Complete delivery address is required");
+    }
+    if (!String(customerName || "").trim() || !/^\+?[1-9]\d{7,14}$/.test(String(customerPhone || "").replace(/[\s()-]/g, ""))) {
+      res.status(400);
+      throw new Error("A valid customer name and phone number are required");
+    }
+    const whatsappNumber = String(process.env.WHATSAPP_ORDER_NUMBER || process.env.ADMIN_PHONE || "").replace(/\D/g, "");
+    if (!/^\d{8,15}$/.test(whatsappNumber)) {
+      res.status(503);
+      throw new Error("WhatsApp ordering is temporarily unavailable");
     }
 
     let items = orderItems;
@@ -29,7 +45,7 @@ const createOrder = async (req, res, next) => {
     const orderProducts = await Promise.all(
       items.map(async (item) => {
         const product = await Product.findById(item.product || item.productId);
-        if (!product) {
+        if (!product || !product.isActive || product.status !== "active") {
           res.status(404);
           throw new Error("Product not found");
         }
@@ -59,14 +75,16 @@ const createOrder = async (req, res, next) => {
       name: product.name,
       quantity,
       price,
-      image: product.images[0] ? product.images[0].url : ""
+      image: product.images.find((image) => image.isPrimary)?.url || product.imageUrl || product.images[0]?.url || ""
     }));
 
     const itemsPrice = normalizedItems.reduce(
       (sum, item) => sum + item.price * item.quantity,
       0
     );
-    const totalPrice = itemsPrice + Number(taxPrice) + Number(shippingPrice);
+    const taxPrice = Math.round(itemsPrice * 0.18);
+    const shippingPrice = itemsPrice > 499 ? 0 : 49;
+    const totalPrice = itemsPrice + taxPrice + shippingPrice;
 
     const order = await Order.create({
       user: req.user._id,
@@ -75,8 +93,12 @@ const createOrder = async (req, res, next) => {
       products: normalizedItems,
       shippingAddress,
       paymentMethod,
-      orderStatus: "confirmed",
-      status: "confirmed",
+      customerName: String(customerName).trim(),
+      customerPhone: String(customerPhone).trim(),
+      orderStatus: "pending",
+      status: "pending",
+      paymentStatus: "pending",
+      itemsPrice,
       taxPrice,
       shippingPrice,
       totalPrice,
@@ -92,9 +114,34 @@ const createOrder = async (req, res, next) => {
 
     await Cart.findOneAndUpdate({ user: req.user._id }, { items: [] });
 
+    const addressText = [shippingAddress.street, shippingAddress.city, shippingAddress.state, shippingAddress.postalCode, shippingAddress.country].join(", ");
+    const itemLines = normalizedItems.map((item, index) =>
+      `${index + 1}. ${item.name} x ${item.quantity} - Rs. ${(item.price * item.quantity).toLocaleString("en-IN")}`
+    );
+    const message = [
+      "Hello, I would like to place this order:",
+      "",
+      `Order ID: ${order.orderId}`,
+      `Customer: ${order.customerName}`,
+      `Phone: ${order.customerPhone}`,
+      `Delivery address: ${addressText}`,
+      "",
+      "Items:",
+      ...itemLines,
+      "",
+      `Subtotal: Rs. ${itemsPrice.toLocaleString("en-IN")}`,
+      ...(Number(taxPrice) > 0 ? [`GST: Rs. ${Number(taxPrice).toLocaleString("en-IN")}`] : []),
+      `Delivery: ${Number(shippingPrice) === 0 ? "FREE" : `Rs. ${Number(shippingPrice).toLocaleString("en-IN")}`}`,
+      `Total: Rs. ${totalPrice.toLocaleString("en-IN")}`,
+      "",
+      "Please confirm availability and delivery."
+    ].join("\n");
+
     res.status(201).json({
       success: true,
-      order
+      order,
+      whatsappUrl: `https://wa.me/${whatsappNumber}?text=${encodeURIComponent(message)}`,
+      orderMessage: message
     });
   } catch (error) {
     next(error);
@@ -156,8 +203,8 @@ const getAllOrders = async (req, res, next) => {
 const updateOrderStatus = async (req, res, next) => {
   try {
     const { orderStatus, paymentStatus } = req.body;
-    const allowedOrderStatuses = ["pending", "processing", "confirmed", "shipped", "delivered", "cancelled", "return", "returned"];
-    const allowedPaymentStatuses = ["pending", "paid", "unpaid", "failed", "refunded"];
+    const allowedOrderStatuses = ["pending", "processing", "confirmed", "shipped", "delivered", "cancelled"];
+    const allowedPaymentStatuses = ["pending", "paid", "unpaid", "failed"];
     const order = await Order.findById(req.params.id);
 
     if (!order) {

@@ -4,7 +4,7 @@
 
 @layer base {
   * { @apply transition-colors duration-200; }
-  body { @apply font-body bg-gray-50 dark:bg-gray-950 text-gray-900 dark:text-gray-100 min-h-screen; }
+  body { @apply min-h-screen bg-primary-50 font-body text-gray-900; }
   h1,h2,h3,h4 { @apply font-display; }
 }
 

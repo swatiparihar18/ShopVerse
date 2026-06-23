@@ -3,7 +3,8 @@ const mongoose = require("mongoose");
 const imageSchema = new mongoose.Schema(
   {
     url: { type: String, required: true },
-    public_id: { type: String, default: "" }
+    public_id: { type: String, default: "" },
+    isPrimary: { type: Boolean, default: false }
   },
   { _id: false }
 );
@@ -33,6 +34,7 @@ const productSchema = new mongoose.Schema(
       type: String,
       trim: true
     },
+    heroDescription: { type: String, trim: true, maxlength: 240, default: "" },
     price: {
       type: Number,
       required: [true, "Product price is required"],
@@ -49,7 +51,7 @@ const productSchema = new mongoose.Schema(
     },
     brand: {
       type: String,
-      default: "ShopVerse",
+      default: "Creation Corner",
       trim: true
     },
     stock: {
@@ -60,7 +62,11 @@ const productSchema = new mongoose.Schema(
     },
     images: {
       type: [imageSchema],
-      default: []
+      default: [],
+      validate: {
+        validator: (images) => images.length <= 8,
+        message: "A product can have at most 8 images"
+      }
     },
     sku: {
       type: String,
@@ -93,6 +99,7 @@ const productSchema = new mongoose.Schema(
       type: Boolean,
       default: false
     },
+    isActive: { type: Boolean, default: true },
     createdBy: {
       type: mongoose.Schema.Types.ObjectId,
       ref: "User",
@@ -103,15 +110,26 @@ const productSchema = new mongoose.Schema(
 );
 
 productSchema.pre("validate", function syncImageUrl(next) {
+  if (this.isModified("status") && !this.isModified("isActive")) this.isActive = this.status === "active";
+  if (this.isModified("isActive")) this.status = this.isActive ? "active" : "inactive";
   if (!this.imageUrl && this.images && this.images[0]) {
     this.imageUrl = this.images[0].url;
   }
   if (this.imageUrl && (!this.images || this.images.length === 0)) {
-    this.images = [{ url: this.imageUrl, public_id: "" }];
+    this.images = [{ url: this.imageUrl, public_id: "", isPrimary: true }];
+  }
+  if (this.images && this.images.length > 0) {
+    const primaryIndex = this.images.findIndex((image) => image.isPrimary);
+    const selectedIndex = primaryIndex >= 0 ? primaryIndex : 0;
+    this.images.forEach((image, index) => {
+      image.isPrimary = index === selectedIndex;
+    });
+    this.imageUrl = this.images[selectedIndex].url;
   }
   next();
 });
 
 productSchema.index({ name: "text", description: "text", category: 1, brand: 1, sku: 1 });
+productSchema.index({ isFeatured: 1, isActive: 1, status: 1, createdAt: -1 });
 
 module.exports = mongoose.model("Product", productSchema);

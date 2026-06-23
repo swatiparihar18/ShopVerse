@@ -16,6 +16,7 @@ const allowedOrigins = [
   "http://localhost:5173",
   "http://localhost:5174",
   "http://localhost:3000",
+  "https://shope-verse-1.onrender.com",
   process.env.FRONTEND_URL
 ].filter(Boolean);
 
@@ -42,7 +43,7 @@ app.use(sanitizeRequest);
 app.get("/", (req, res) => {
   res.status(200).json({
     success: true,
-    message: "Shopverse API is running"
+    message: "Creation Corner API is running"
   });
 });
 

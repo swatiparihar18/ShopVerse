@@ -1,5 +1,6 @@
+import { useState } from 'react'
 import { Link } from 'react-router-dom'
-import { Check, Heart, ShoppingCart, Star } from 'lucide-react'
+import { Check, Heart, ImageOff, ShoppingCart, Star } from 'lucide-react'
 import { useCart } from '../../context/CartContext'
 import { useWishlist } from '../../context/WishlistContext'
 
@@ -14,6 +15,7 @@ const BADGE_STYLES = {
 }
 
 export default function ProductCard({ product }) {
+  const [imageFailed, setImageFailed] = useState(false)
   const { addToCart, isInCart } = useCart()
   const { toggleWishlist, isWishlisted } = useWishlist()
   const inCart = isInCart(product.id)
@@ -24,16 +26,17 @@ export default function ProductCard({ product }) {
     <div className="card group flex flex-col overflow-hidden animate-fade-in">
       <div className="relative aspect-square overflow-hidden bg-gray-100 dark:bg-gray-700">
         <Link to={`/product/${product.id}`}>
-          {product.image ? (
+          {product.image && !imageFailed ? (
             <img
               src={product.image}
               alt={product.name}
-              className="h-full w-full object-cover transition-transform duration-500"
+              className="h-full w-full object-contain p-2 transition-transform duration-500"
               onMouseEnter={(event) => { event.currentTarget.style.transform = 'scale(1.08)' }}
               onMouseLeave={(event) => { event.currentTarget.style.transform = 'scale(1)' }}
+              onError={() => setImageFailed(true)}
             />
           ) : (
-            <div className="flex h-full items-center justify-center text-xs text-gray-400">No image</div>
+            <div className="flex h-full flex-col items-center justify-center gap-2 text-xs text-gray-400"><ImageOff className="h-6 w-6" />No image available</div>
           )}
         </Link>
 
@@ -61,6 +64,7 @@ export default function ProductCard({ product }) {
         <Link to={`/product/${product.id}`}>
           <h3 className="mb-2 line-clamp-2 text-sm font-semibold leading-snug text-gray-900 transition-colors hover:text-primary-500 dark:text-white">{product.name}</h3>
         </Link>
+        <p className={`mb-2 text-xs font-semibold ${product.stock > 0 ? 'text-gray-500' : 'text-red-500'}`}>{product.stock > 0 ? `${product.stock} in stock` : 'Out of stock'}</p>
         <div className="mb-3 flex items-center gap-1.5">
           <div className="flex">
             {[...Array(5)].map((_, index) => (

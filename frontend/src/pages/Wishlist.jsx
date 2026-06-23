@@ -4,7 +4,7 @@ import EmptyState  from '../components/common/EmptyState'
 import { useWishlist } from '../context/WishlistContext'
 
 export default function Wishlist() {
-  const { wishlist, clearWishlist } = useWishlist()
+  const { wishlist, clearWishlist, loading } = useWishlist()
 
   return (
     <div className="page-container animate-fade-in">
@@ -22,7 +22,7 @@ export default function Wishlist() {
         )}
       </div>
 
-      {wishlist.length === 0 ? (
+      {loading ? <div className="grid grid-cols-2 gap-4 sm:grid-cols-3 lg:grid-cols-4">{[1, 2, 3, 4].map((item) => <div key={item} className="skeleton aspect-square" />)}</div> : wishlist.length === 0 ? (
         <EmptyState
           icon="❤️"
           title="Your wishlist is empty"

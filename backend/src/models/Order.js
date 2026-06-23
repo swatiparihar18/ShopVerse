@@ -1,4 +1,5 @@
 const mongoose = require("mongoose");
+const crypto = require("crypto");
 
 const orderItemSchema = new mongoose.Schema(
   {
@@ -28,6 +29,12 @@ const shippingAddressSchema = new mongoose.Schema(
 
 const orderSchema = new mongoose.Schema(
   {
+    orderId: {
+      type: String,
+      unique: true,
+      sparse: true,
+      default: () => `SV-${Date.now().toString(36).toUpperCase()}-${crypto.randomBytes(3).toString("hex").toUpperCase()}`
+    },
     user: {
       type: mongoose.Schema.Types.ObjectId,
       ref: "User",
@@ -37,6 +44,8 @@ const orderSchema = new mongoose.Schema(
       type: mongoose.Schema.Types.ObjectId,
       ref: "User"
     },
+    customerName: { type: String, required: true, trim: true, default: "Customer" },
+    customerPhone: { type: String, required: true, trim: true, default: "Not provided" },
     orderItems: {
       type: [orderItemSchema],
       required: true,
@@ -60,23 +69,29 @@ const orderSchema = new mongoose.Schema(
     },
     paymentStatus: {
       type: String,
-      enum: ["pending", "paid", "unpaid", "failed", "refunded"],
+      enum: ["pending", "paid", "unpaid", "failed"],
       default: "pending"
     },
     orderStatus: {
       type: String,
-      enum: ["pending", "processing", "confirmed", "shipped", "delivered", "cancelled", "return", "returned"],
+      enum: ["pending", "processing", "confirmed", "shipped", "delivered", "cancelled"],
       default: "pending"
     },
     status: {
       type: String,
-      enum: ["pending", "processing", "confirmed", "shipped", "delivered", "cancelled", "return", "returned"],
+      enum: ["pending", "processing", "confirmed", "shipped", "delivered", "cancelled"],
       default: "pending"
     },
     totalPrice: {
       type: Number,
       required: true,
       min: 0
+    },
+    itemsPrice: {
+      type: Number,
+      required: true,
+      min: 0,
+      default: 0
     },
     totalAmount: {
       type: Number,

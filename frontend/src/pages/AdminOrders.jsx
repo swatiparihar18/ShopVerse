@@ -3,8 +3,8 @@ import { RefreshCw, Save } from 'lucide-react'
 import { orderApi } from '../services/api'
 import { useToast } from '../context/ToastContext'
 
-const ORDER_STATUSES = ['pending', 'processing', 'confirmed', 'shipped', 'delivered', 'cancelled', 'return', 'returned']
-const PAYMENT_STATUSES = ['pending', 'paid', 'unpaid', 'failed', 'refunded']
+const ORDER_STATUSES = ['pending', 'processing', 'confirmed', 'shipped', 'delivered', 'cancelled']
+const PAYMENT_STATUSES = ['pending', 'paid', 'unpaid', 'failed']
 
 const money = (value) => `Rs. ${Number(value || 0).toLocaleString()}`
 const label = (value) => value.charAt(0).toUpperCase() + value.slice(1)

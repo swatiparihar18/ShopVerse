@@ -1,7 +1,7 @@
-import { createContext, useContext, useEffect, useReducer, useState } from 'react'
+import { createContext, useContext, useEffect, useReducer, useRef, useState } from 'react'
 import { useAuth } from './AuthContext'
 import { useToast } from './ToastContext'
-import { cartApi, normalizeProduct } from '../services/api'
+import { cartApi, normalizeProduct, productApi } from '../services/api'
 
 const CartContext = createContext()
 
@@ -10,7 +10,7 @@ const toLocalItem = (item) => {
   return {
     ...product,
     qty: Number(item.quantity || item.qty || 1),
-    price: Number(item.price || product.price)
+    price: Number(product.price)
   }
 }
 
@@ -37,30 +37,36 @@ const cartReducer = (state, action) => {
 }
 
 export function CartProvider({ children }) {
-  const saved = JSON.parse(localStorage.getItem('sv_cart') || '[]')
-  const [cart, dispatch] = useReducer(cartReducer, saved)
+  const savedRef = useRef(readSavedCart())
+  const [cart, dispatch] = useReducer(cartReducer, [])
   const [loading, setLoading] = useState(false)
-  const { isAuthenticated } = useAuth()
+  const { isAuthenticated, initializing } = useAuth()
   const { showToast } = useToast()
 
   useEffect(() => {
-    localStorage.setItem('sv_cart', JSON.stringify(cart))
+    localStorage.setItem('sv_cart', JSON.stringify(cart.map((item) => ({ id: item.id, qty: item.qty }))))
   }, [cart])
 
   useEffect(() => {
-    if (!isAuthenticated) return
+    if (initializing) return
     let active = true
     setLoading(true)
-    cartApi.get()
+    const request = isAuthenticated
+      ? cartApi.get().then((data) => (data.cart?.items || []).map(toLocalItem))
+      : productApi.validate(savedRef.current.map((item) => item?.id || item?._id).filter(Boolean)).then((data) => {
+          const quantities = new Map(savedRef.current.map((item) => [String(item?.id || item?._id), Number(item.qty) || 1]))
+          return (data.products || []).map(normalizeProduct).map((product) => ({ ...product, qty: Math.min(quantities.get(String(product.id)) || 1, Math.max(product.stock, 1)) }))
+        })
+    request
       .then((data) => {
-        if (active) dispatch({ type: 'SET', payload: (data.cart?.items || []).map(toLocalItem) })
+        if (active) dispatch({ type: 'SET', payload: data })
       })
-      .catch((err) => showToast?.(err.message, 'error'))
+      .catch((err) => { if (active) { dispatch({ type: 'SET', payload: [] }); showToast?.(err.message, 'error') } })
       .finally(() => active && setLoading(false))
     return () => {
       active = false
     }
-  }, [isAuthenticated, showToast])
+  }, [isAuthenticated, initializing, showToast])
 
   const applyServerCart = (data) => {
     dispatch({ type: 'SET', payload: (data.cart?.items || []).map(toLocalItem) })
@@ -138,3 +144,5 @@ export function CartProvider({ children }) {
 }
 
 export const useCart = () => useContext(CartContext)
+
+function readSavedCart() { try { const value = JSON.parse(localStorage.getItem('sv_cart') || '[]'); return Array.isArray(value) ? value : [] } catch { return [] } }

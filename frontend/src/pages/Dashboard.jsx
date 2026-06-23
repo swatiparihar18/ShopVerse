@@ -164,7 +164,7 @@ function ReviewForm({ item, reviewing, setReviewing, showToast }) {
     <form onSubmit={submitReview} className="rounded-xl border border-gray-100 p-4 dark:border-gray-700">
       <div className="mb-3 flex gap-3">
         <div className="h-14 w-14 flex-shrink-0 overflow-hidden rounded-xl bg-gray-100 dark:bg-gray-700">
-          {item.image && <img src={item.image} alt={item.name} className="h-full w-full object-cover" />}
+          {item.image && <img src={item.image} alt={item.name} className="h-full w-full object-contain p-1" />}
         </div>
         <div>
           <p className="font-semibold text-gray-900 dark:text-white">{item.name}</p>

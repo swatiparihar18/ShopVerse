@@ -16,6 +16,27 @@ const uploadProductImages = async (files = []) => {
   );
 };
 
+const parseImageOrder = (value) => {
+  if (!value) return [];
+  try {
+    const parsed = JSON.parse(value);
+    return Array.isArray(parsed) ? parsed : [];
+  } catch {
+    const error = new Error("Invalid product image order");
+    error.statusCode = 400;
+    throw error;
+  }
+};
+
+const markPrimaryImage = (images, requestedIndex = 0) => {
+  const primaryIndex = Math.min(Math.max(Number(requestedIndex) || 0, 0), Math.max(images.length - 1, 0));
+  return images.map((image, index) => ({
+    url: image.url,
+    public_id: image.public_id || "",
+    isPrimary: index === primaryIndex
+  }));
+};
+
 const ensureCanManageProduct = (req, product) => {
   const isAdmin = req.user.role === "admin";
   const isOwner = product.createdBy.toString() === req.user._id.toString();
@@ -32,6 +53,7 @@ const createProduct = async (req, res, next) => {
     const {
       name,
       description,
+      heroDescription,
       price,
       discountPrice,
       category,
@@ -40,28 +62,39 @@ const createProduct = async (req, res, next) => {
       sku,
       imageUrl,
       status,
-      isFeatured
+      isFeatured,
+      isActive
     } = req.body;
 
     if (!name || !price || stock === undefined) {
       res.status(400);
       throw new Error("Name, price, and stock are required");
     }
+    if ((req.files || []).length + (imageUrl ? 1 : 0) > 8) {
+      res.status(400);
+      throw new Error("A product can have at most 8 images");
+    }
 
-    const images = await uploadProductImages(req.files);
+    const uploadedImages = await uploadProductImages(req.files);
+    const urlImage = imageUrl && !uploadedImages.some((image) => image.url === imageUrl)
+      ? [{ url: imageUrl, public_id: "" }]
+      : [];
+    const images = markPrimaryImage([...uploadedImages, ...urlImage], req.body.primaryIndex);
     const product = await Product.create({
       name,
       description: description || "",
+      heroDescription: heroDescription || "",
       price,
       discountPrice,
       category: category || "Uncategorized",
-      brand: brand || "ShopVerse",
+      brand: brand || "Creation Corner",
       stock,
       images,
       sku,
       imageUrl,
       status,
       isFeatured: parseBoolean(isFeatured),
+      isActive: isActive === undefined ? (status || "active") === "active" : parseBoolean(isActive),
       createdBy: req.user._id
     });
 
@@ -81,6 +114,10 @@ const getProducts = async (req, res, next) => {
     const skip = (page - 1) * limit;
 
     const filter = {};
+    if (req.query.active !== "all") {
+      filter.isActive = req.query.active === undefined ? true : parseBoolean(req.query.active);
+      if (filter.isActive) filter.status = "active";
+    }
     if (req.query.search) {
       filter.name = { $regex: req.query.search, $options: "i" };
     }
@@ -120,9 +157,34 @@ const getProducts = async (req, res, next) => {
   }
 };
 
+const getFeaturedProducts = async (req, res, next) => {
+  try {
+    const products = await Product.find({ isFeatured: true, isActive: true, status: "active" })
+      .sort({ updatedAt: -1 })
+      .limit(20);
+    res.status(200).json({ success: true, count: products.length, products });
+  } catch (error) {
+    next(error);
+  }
+};
+
+const validateProducts = async (req, res, next) => {
+  try {
+    const mongoose = require("mongoose");
+    const ids = Array.isArray(req.body.ids) ? [...new Set(req.body.ids.map(String))].slice(0, 100) : [];
+    const validIds = ids.filter((id) => mongoose.isValidObjectId(id));
+    const products = validIds.length
+      ? await Product.find({ _id: { $in: validIds }, isActive: true, status: "active" })
+      : [];
+    res.status(200).json({ success: true, count: products.length, products });
+  } catch (error) {
+    next(error);
+  }
+};
+
 const getProductById = async (req, res, next) => {
   try {
-    const product = await Product.findById(req.params.id).populate("createdBy", "name email");
+    const product = await Product.findOne({ _id: req.params.id, isActive: true, status: "active" }).populate("createdBy", "name email");
     if (!product) {
       res.status(404);
       throw new Error("Product not found");
@@ -210,6 +272,7 @@ const updateProduct = async (req, res, next) => {
     const allowedFields = [
       "name",
       "description",
+      "heroDescription",
       "price",
       "discountPrice",
       "category",
@@ -229,13 +292,45 @@ const updateProduct = async (req, res, next) => {
     if (req.body.isFeatured !== undefined) {
       product.isFeatured = parseBoolean(req.body.isFeatured);
     }
-
-    if (req.files && req.files.length > 0) {
-      await Promise.all(product.images.map((image) => deleteFromCloudinary(image.public_id)));
-      product.images = await uploadProductImages(req.files);
+    if (req.body.isActive !== undefined) {
+      product.isActive = parseBoolean(req.body.isActive);
+      product.status = product.isActive ? "active" : "inactive";
+    } else if (req.body.status !== undefined) {
+      product.isActive = req.body.status === "active";
     }
 
+    const previousImages = product.images.map((image) => image.toObject());
+    const uploadedImages = await uploadProductImages(req.files || []);
+    const requestedOrder = parseImageOrder(req.body.imageOrder);
+    let nextImages;
+
+    if (requestedOrder.length > 0) {
+      nextImages = requestedOrder.map((entry) => {
+        if (entry.type === "new") return uploadedImages[Number(entry.index)];
+        return previousImages.find((image) =>
+          (entry.public_id && image.public_id === entry.public_id) || (!entry.public_id && image.url === entry.url)
+        );
+      }).filter(Boolean);
+    } else {
+      nextImages = [...previousImages, ...uploadedImages];
+    }
+
+    if (req.body.imageUrl && !nextImages.some((image) => image.url === req.body.imageUrl)) {
+      nextImages.push({ url: req.body.imageUrl, public_id: "" });
+    }
+    if (nextImages.length > 8) {
+      await Promise.all(uploadedImages.map((image) => deleteFromCloudinary(image.public_id)));
+      res.status(400);
+      throw new Error("A product can have at most 8 images");
+    }
+
+    product.images = markPrimaryImage(nextImages, req.body.primaryIndex);
+
     const updatedProduct = await product.save();
+    const retainedIds = new Set(updatedProduct.images.map((image) => image.public_id).filter(Boolean));
+    const removedImages = previousImages.filter((image) => image.public_id && !retainedIds.has(image.public_id));
+    const unusedUploads = uploadedImages.filter((image) => image.public_id && !retainedIds.has(image.public_id));
+    await Promise.all([...removedImages, ...unusedUploads].map((image) => deleteFromCloudinary(image.public_id)));
 
     res.status(200).json({
       success: true,
@@ -457,8 +552,10 @@ const getImportHistory = async (req, res, next) => {
 module.exports = {
   createProduct,
   createProductReview,
+  getFeaturedProducts,
   getProducts,
   getProductById,
+  validateProducts,
   updateProduct,
   deleteProduct,
   getImportHistory,

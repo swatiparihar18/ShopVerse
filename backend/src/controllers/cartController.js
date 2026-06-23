@@ -10,7 +10,20 @@ const getOrCreateCart = async (userId) => {
 };
 
 const populateCart = (cartQuery) => {
-  return cartQuery.populate("items.product", "name price discountPrice stock images category brand");
+  return cartQuery.populate("items.product", "name price discountPrice stock images imageUrl category brand status isActive");
+};
+
+const removeUnavailableItems = async (cart) => {
+  if (!cart) return cart;
+  const available = cart.items.filter((item) => item.product && item.product.isActive && item.product.status === "active");
+  if (available.length !== cart.items.length) {
+    cart.items = available;
+  }
+  cart.items.forEach((item) => {
+    item.price = item.product.discountPrice > 0 ? item.product.discountPrice : item.product.price;
+  });
+  await cart.save();
+  return cart;
 };
 
 const addToCart = async (req, res, next) => {
@@ -23,7 +36,7 @@ const addToCart = async (req, res, next) => {
     }
 
     const product = await Product.findById(productId);
-    if (!product) {
+    if (!product || !product.isActive || product.status !== "active") {
       res.status(404);
       throw new Error("Product not found");
     }
@@ -60,7 +73,7 @@ const addToCart = async (req, res, next) => {
     }
 
     await cart.save();
-    const populatedCart = await populateCart(Cart.findById(cart._id));
+    const populatedCart = await removeUnavailableItems(await populateCart(Cart.findById(cart._id)));
 
     res.status(200).json({
       success: true,
@@ -73,7 +86,7 @@ const addToCart = async (req, res, next) => {
 
 const getCart = async (req, res, next) => {
   try {
-    const cart = await populateCart(Cart.findOne({ user: req.user._id }));
+    const cart = await removeUnavailableItems(await populateCart(Cart.findOne({ user: req.user._id })));
 
     res.status(200).json({
       success: true,
@@ -96,7 +109,7 @@ const updateCartItem = async (req, res, next) => {
     }
 
     const product = await Product.findById(productId);
-    if (!product) {
+    if (!product || !product.isActive || product.status !== "active") {
       res.status(404);
       throw new Error("Product not found");
     }
@@ -122,7 +135,7 @@ const updateCartItem = async (req, res, next) => {
     item.price = product.discountPrice > 0 ? product.discountPrice : product.price;
 
     await cart.save();
-    const populatedCart = await populateCart(Cart.findById(cart._id));
+    const populatedCart = await removeUnavailableItems(await populateCart(Cart.findById(cart._id)));
 
     res.status(200).json({
       success: true,
@@ -146,7 +159,7 @@ const removeCartItem = async (req, res, next) => {
     );
 
     await cart.save();
-    const populatedCart = await populateCart(Cart.findById(cart._id));
+    const populatedCart = await removeUnavailableItems(await populateCart(Cart.findById(cart._id)));
 
     res.status(200).json({
       success: true,

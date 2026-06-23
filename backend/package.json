@@ -1,9 +1,10 @@
 {
   "name": "shopverse-backend",
   "version": "1.0.0",
-  "description": "Express and MongoDB backend for Shopverse e-commerce.",
+  "description": "Express and MongoDB backend for Creation Corner e-commerce.",
   "main": "src/server.js",
   "scripts": {
+    
     "start": "node src/server.js",
     "dev": "nodemon src/server.js",
     "migrate": "node -e \"require('./src/config/db')().then(() => require('./src/utils/runStartupMigrations')()).then(() => process.exit(0)).catch((error) => { console.error(error); process.exit(1); })\""

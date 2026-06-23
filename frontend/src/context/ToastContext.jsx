@@ -1,5 +1,6 @@
 import { createContext, useCallback, useContext, useState } from 'react'
 import { X } from 'lucide-react'
+import { v4 as uuidv4 } from "uuid";
 
 const ToastContext = createContext(null)
 
@@ -7,9 +8,9 @@ export function ToastProvider({ children }) {
   const [toasts, setToasts] = useState([])
 
   const showToast = useCallback((message, type = 'success') => {
-   const id = typeof crypto.randomUUID === 'function' 
-  ? crypto.randomUUID() 
-  : Math.random().toString(36).substring(2) + Date.now().toString(36)
+
+
+const id = uuidv4();
     setToasts((current) => [...current, { id, message, type }])
     window.setTimeout(() => {
       setToasts((current) => current.filter((toast) => toast.id !== id))

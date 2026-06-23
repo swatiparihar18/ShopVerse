@@ -1,6 +1,6 @@
 import { useEffect, useState } from 'react'
 import { Link, useParams } from 'react-router-dom'
-import { ArrowLeft, Check, ChevronLeft, ChevronRight, Heart, RotateCcw, Shield, ShoppingCart, Star, Truck } from 'lucide-react'
+import { ArrowLeft, Check, ChevronLeft, ChevronRight, Heart, Shield, ShoppingCart, Star, Truck } from 'lucide-react'
 import ProductCard from '../components/product/ProductCard'
 import { useCart } from '../context/CartContext'
 import { useWishlist } from '../context/WishlistContext'
@@ -79,7 +79,7 @@ export default function ProductDetail() {
       <div className="mb-16 grid gap-10 md:grid-cols-2">
         <div>
           <div className="relative aspect-square overflow-hidden rounded-2xl bg-gray-100 dark:bg-gray-800">
-            {activeImage ? <img src={activeImage} alt={product.name} className="h-full w-full object-cover" /> : <div className="flex h-full items-center justify-center text-sm text-gray-400">No image</div>}
+            {activeImage ? <img src={activeImage} alt={product.name} className="h-full w-full object-contain p-3 sm:p-5" /> : <div className="flex h-full items-center justify-center text-sm text-gray-400">No image available</div>}
             {discount > 0 && <span className="badge absolute right-4 top-4 bg-green-500 px-3 py-1 text-sm text-white">{discount}% OFF</span>}
             {hasSlides && (
               <>
@@ -112,7 +112,7 @@ export default function ProductDetail() {
                   className={`h-16 w-16 flex-shrink-0 overflow-hidden rounded-xl border-2 bg-gray-100 dark:bg-gray-800 ${activeSlide === index ? 'border-primary-500' : 'border-transparent'}`}
                   aria-label={`Show product image ${index + 1}`}
                 >
-                  <img src={slide} alt="" className="h-full w-full object-cover" />
+                  <img src={slide} alt="" className="h-full w-full object-contain p-1" />
                 </button>
               ))}
             </div>
@@ -146,11 +146,10 @@ export default function ProductDetail() {
               <Heart className="h-6 w-6" fill={wishlisted ? 'currentColor' : 'none'} />
             </button>
           </div>
-          <div className="grid grid-cols-3 gap-3 rounded-2xl bg-gray-50 p-4 dark:bg-gray-800">
+          <div className="grid grid-cols-2 gap-3 rounded-2xl bg-gray-50 p-4 dark:bg-gray-800">
             {[
               { icon: Truck, label: 'Delivery' },
-              { icon: Shield, label: 'Secure' },
-              { icon: RotateCcw, label: 'Returns' }
+              { icon: Shield, label: 'Secure ordering' }
             ].map(({ icon: Icon, label }) => (
               <div key={label} className="flex flex-col items-center gap-1.5 text-center">
                 <Icon className="h-5 w-5 text-primary-500" />
@@ -158,6 +157,7 @@ export default function ProductDetail() {
               </div>
             ))}
           </div>
+          <p className="mt-3 text-center text-xs text-gray-500 dark:text-gray-400">Returns are not available. Please review product details before ordering.</p>
         </div>
       </div>
 

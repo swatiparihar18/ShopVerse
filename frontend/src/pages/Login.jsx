@@ -44,7 +44,7 @@ export default function Login() {
       <div className="card w-full max-w-md p-6 sm:p-8">
         <div className="mb-6">
           <h1 className="font-display text-3xl font-bold text-gray-900 dark:text-white">Login</h1>
-          <p className="mt-2 text-sm text-gray-500 dark:text-gray-400">Access your ShopVerse account.</p>
+          <p className="mt-2 text-sm text-gray-500 dark:text-gray-400">Access your Creation Corner account.</p>
         </div>
 
         {error && <div className="mb-4 rounded-xl bg-red-50 px-4 py-3 text-sm font-semibold text-red-600 dark:bg-red-900/20 dark:text-red-300">{error}</div>}
