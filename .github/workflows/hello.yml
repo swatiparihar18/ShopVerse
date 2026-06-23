@@ -1,14 +1,28 @@
-name: My First Workflow
+name: Explore Runner
 
 on:
   push:
 
 jobs:
-  hello:
-
+  explore:
     runs-on: ubuntu-latest
 
     steps:
-      - name: Print Message
-        run: echo "Hello Swati"
 
+      - name: Checkout Repository
+        uses: actions/checkout@v4
+
+      - name: Current Directory
+        run: pwd
+
+      - name: List Files
+        run: ls -la
+
+      - name: Current User
+        run: whoami
+
+      - name: Show Date
+        run: date
+
+      - name: Docker Version
+        run: docker --version
